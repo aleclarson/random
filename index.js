@@ -1,3 +1,4 @@
+
 // We use cryptographically strong PRNGs (crypto.getRandomBytes() on the server,
 // window.crypto.getRandomValues() in the browser) when available. If these
 // PRNGs fail, we fall back to the Alea PRNG, which is not cryptographically
@@ -6,9 +7,6 @@
 // primitive is hexString(), from which we construct fraction(). When using
 // window.crypto.getRandomValues() or alea, the primitive is fraction and we use
 // that to construct hex string.
-
-if (Meteor.isServer)
-  var nodeCrypto = Npm.require('crypto');
 
 // see http://baagoe.org/en/wiki/Better_random_numbers_for_javascript
 // for a full discussion and Alea implementation.
@@ -103,9 +101,6 @@ RandomGenerator.prototype.fraction = function () {
   var self = this;
   if (self.alea) {
     return self.alea();
-  } else if (nodeCrypto) {
-    var numerator = parseInt(self.hexString(8), 16);
-    return numerator * 2.3283064365386963e-10; // 2^-32
   } else if (typeof window !== "undefined" && window.crypto &&
              window.crypto.getRandomValues) {
     var array = new Uint32Array(1);
@@ -117,29 +112,11 @@ RandomGenerator.prototype.fraction = function () {
 };
 
 RandomGenerator.prototype.hexString = function (digits) {
-  var self = this;
-  if (nodeCrypto && ! self.alea) {
-    var numBytes = Math.ceil(digits / 2);
-    var bytes;
-    // Try to get cryptographically strong randomness. Fall back to
-    // non-cryptographically strong if not available.
-    try {
-      bytes = nodeCrypto.randomBytes(numBytes);
-    } catch (e) {
-      // XXX should re-throw any error except insufficient entropy
-      bytes = nodeCrypto.pseudoRandomBytes(numBytes);
-    }
-    var result = bytes.toString("hex");
-    // If the number of digits is odd, we'll have generated an extra 4 bits
-    // of randomness, so we need to trim the last digit.
-    return result.substring(0, digits);
-  } else {
-    var hexDigits = [];
-    for (var i = 0; i < digits; ++i) {
-      hexDigits.push(self.choice("0123456789abcdef"));
-    }
-    return hexDigits.join('');
+  var hexDigits = [];
+  for (var i = 0; i < digits; ++i) {
+    hexDigits.push(this.choice("0123456789abcdef"));
   }
+  return hexDigits.join('');
 };
 
 RandomGenerator.prototype._randomString = function (charsCount,
@@ -203,12 +180,7 @@ var width = (typeof window !== 'undefined' && window.innerWidth) ||
 
 var agent = (typeof navigator !== 'undefined' && navigator.userAgent) || "";
 
-if (nodeCrypto ||
-    (typeof window !== "undefined" &&
-     window.crypto && window.crypto.getRandomValues))
-  Random = new RandomGenerator();
-else
-  Random = new RandomGenerator([new Date(), height, width, agent, Math.random()]);
+var Random = new RandomGenerator([new Date(), height, width, agent, Math.random()]);
 
 Random.createWithSeeds = function () {
   if (arguments.length === 0) {
@@ -216,3 +188,5 @@ Random.createWithSeeds = function () {
   }
   return new RandomGenerator(arguments);
 };
+
+module.exports = Random;
